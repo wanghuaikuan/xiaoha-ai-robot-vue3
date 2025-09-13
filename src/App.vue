@@ -1,9 +1,6 @@
 <template>
- <div>
-   <h1 class="text-3xl font-bold bg-yellow-500">
-      犬小哈实战专栏!
-    </h1>
- </div>
+  <!--动态渲染组件-->
+  <router-view></router-view>
 </template>
 
 <script setup>
