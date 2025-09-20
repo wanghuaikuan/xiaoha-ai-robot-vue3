@@ -1,7 +1,7 @@
 <template>
-  <div class="h-screen max-w-3xl mx-auto relative">
+  <div class="h-screen flex flex-col overflow-y-auto" ref="chatContainer">
     <!-- 聊天记录区域 -->
-    <div class="overflow-y-auto pb-24 pt-4 px-4">
+    <div class="flex-1 max-w-3xl mx-auto  pb-24 pt-4 px-4">
         <!-- 遍历聊天记录 -->
         <template v-for="(chat,index) in chatList" :key="index"> 
           <div v-if="chat.role === 'user'" class="flex justify-end mb-4">
@@ -19,13 +19,13 @@
           </div>
           <!-- 回复的内容 -->
           <div class="p-1 max-w-[80%] mb-2 grow">
-            <p>{{ chat.content }}</p>
+            <StreamMarkdownRender :content="chat.content" />
           </div>
         </div>
       </template>
     </div>
     <!-- 提问输入框 -->
-    <div class="absolute bottom-0 left-0 w-full mb-5">
+    <div class="sticky max-w-3xl mx-auto bg-white bottom-0 left-0 w-full mb-5">
       <div class="bg-gray-100 rounded-3xl px-4 py-3 mx-4 border border-gray-200">
         <textarea 
           ref="textareaRef"
@@ -33,11 +33,16 @@
           placeholder="给小哈 AI 机器人发送消息"
           class="bg-transparent border-none outline-none w-full text-sm resize-none min-h-[24px]" 
           rows="2"
+          @keydown.enter.prevent="sendMessage"
           @input="autoResize">
         </textarea>
          <!-- 发送按钮 -->
         <div class="flex justify-end">
-          <button @click="sendMessage" class="flex items-center justify-center bg-[#4d6bfe] rounded-full w-8 h-8 border border-[#4d6bfe] hover:bg-[#3b5bef] transition-colors">
+          <button @click="sendMessage" 
+          :disabled="!message.trim()"
+          class="flex items-center justify-center bg-[#4d6bfe] rounded-full w-8 h-8 border border-[#4d6bfe] hover:bg-[#3b5bef] transition-colors"
+          disabled:opacity-50
+          disabled:cursor-not-allowed>
             <svg t="1749193234203" class="icon w-5 h-5" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1468" width="200" height="200"><path d="M554.666667 354.56V810.666667a42.666667 42.666667 0 0 1-85.333334 0V354.56a8.533333 8.533333 0 0 0-14.549333-5.973333l-184.149333 184.106666a42.666667 42.666667 0 0 1-60.330667-60.330666l241.365333-241.365334a85.333333 85.333333 0 0 1 120.661334 0l241.365333 241.365334a42.666667 42.666667 0 0 1-60.330667 60.330666l-184.149333-184.149333a8.533333 8.533333 0 0 0-14.549333 6.058667z" fill="#ffffff" p-id="1469"></path></svg>
           </button>
         </div>
@@ -62,9 +67,14 @@
   max-width: calc(100% - 48px);
   position: relative;
 }
+/* 聊天内容区域样式 */
+.overflow-y-auto {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent; /* 自定义滚动条颜色 */
+}
 </style>
 <script setup>
-import { onBeforeUnmount, ref } from 'vue';
+import StreamMarkdownRender from '@/components/StreamMarkdownRender.vue';
+import { onBeforeUnmount, ref,nextTick } from 'vue';
 const chatList = ref([
   {role:'assistant',content:'我是DeepSeek Chat，由深度求索公司开发的智能AI助手！✨ 我可以帮你解答各种问题，无论是学习、工作，还是日常生活中的小困惑，都可以找我聊聊。有什么我可以帮你的吗？😊'},
 ]);
@@ -72,7 +82,7 @@ const chatList = ref([
 const textareaRef = ref(null);
 const message = ref('');
 let eventSource = null;
-
+const chatContainer = ref(null);
 const sendMessage =async () => { 
   if(!message.value.trim()) return;
   const userMessage = message.value.trim();
@@ -89,8 +99,10 @@ const sendMessage =async () => {
     eventSource.onmessage = (event) => {
       console.log('接收到数据: ', event.data)
       if(event.data){
-        responseText += event.data;
+        let response =JSON.parse(event.data);
+        responseText += response.v;
         chatList.value[chatList.value.length - 1].content = responseText;
+        scrollToBottom();
       }
     }
 
@@ -102,12 +114,14 @@ const sendMessage =async () => {
         chatList.value[chatList.value.length - 1].content = '抱歉，请求出错了，请稍后重试。'
       }
       closeSSE();
+      scrollToBottom();
     }
   } catch (error) {
     console.error('发送消息错误: ', error)
     // 提示用户 “请求出错”
     chatList.value[chatList.value.length - 1].content = '抱歉，请求出错了，请稍后重试。';
     closeSSE();
+    scrollToBottom();
   }
 }
 const closeSSE = () => {
@@ -124,9 +138,17 @@ const autoResize = () => {
   const textarea = textareaRef.value;
   if (textarea) { // 若文本域存在
     textarea.style.height = 'auto'; // 1. 先将高度重置为 'auto'
-    textarea.style.height = textarea.scrollHeight + 'px'; // 2. 再设置为内容的实际高度
+    const newHeight = Math.min(textarea.scrollHeight,300);
+    textarea.style.height = newHeight + 'px';
+    textarea.style.overflowY = textarea.scrollHeight > 300 ? 'auto' : 'hidden';
   } 
 };
+const scrollToBottom = async () => {
+  await nextTick();
+  if(chatContainer.value){
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+  }
+}
 </script>
 
 
