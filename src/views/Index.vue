@@ -93,7 +93,7 @@ const sendMessage =async () => {
   }
   chatList.value.push({role:'assistant',content:''});
   try {
-    eventSource = new EventSource(`http://localhost:8080/v6/ai/generateStream?message=${encodeURIComponent(userMessage)}`)
+    eventSource = new EventSource(`http://localhost:8080/v7/ai/generateStream3?message=${encodeURIComponent(userMessage)}&lang=Java`)
     
      let responseText = ''
     eventSource.onmessage = (event) => {

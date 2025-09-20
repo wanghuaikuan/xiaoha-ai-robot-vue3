@@ -47,7 +47,7 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         ws: false,
-        rewrite: (path) => path.replace(/^\/v6/, '/v6'),
+        rewrite: (path) => path.replace(/^\/v7/, '/v7'),
       },
     },
   },
