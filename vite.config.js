@@ -41,4 +41,14 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    proxy: {
+      '/v1': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: false,
+        rewrite: (path) => path.replace(/^\/v6/, '/v6'),
+      },
+    },
+  },
 })

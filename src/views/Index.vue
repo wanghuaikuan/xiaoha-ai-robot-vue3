@@ -2,14 +2,15 @@
   <div class="h-screen max-w-3xl mx-auto relative">
     <!-- 聊天记录区域 -->
     <div class="overflow-y-auto pb-24 pt-4 px-4">
-        <!-- 用户提问消息（靠右） -->
-        <div class="flex justify-end mb-4">
-          <div class="question-container">
-          <p>你是谁</p>
+        <!-- 遍历聊天记录 -->
+        <template v-for="(chat,index) in chatList" :key="index"> 
+          <div v-if="chat.role === 'user'" class="flex justify-end mb-4">
+              <div class="question-container">
+                <p>{{ chat.content }}</p>
+              </div>
           </div>
-        </div>
         <!-- 大模型回复消息（靠左） -->
-        <div class="flex mb-4">
+        <div v-else class="flex mb-4">
           <!-- 头像 -->
           <div class="flex-shrink-0 mr-3">
             <div class="w-8 h-8 rounded-full flex items-center justify-center border border-gray-200">
@@ -18,9 +19,10 @@
           </div>
           <!-- 回复的内容 -->
           <div class="p-1 max-w-[80%] mb-2 grow">
-            <p>我是DeepSeek Chat，由深度求索公司开发的智能AI助手！✨ 我可以帮你解答各种问题，无论是学习、工作，还是日常生活中的小困惑，都可以找我聊聊。有什么我可以帮你的吗？😊</p>
+            <p>{{ chat.content }}</p>
           </div>
         </div>
+      </template>
     </div>
     <!-- 提问输入框 -->
     <div class="absolute bottom-0 left-0 w-full mb-5">
@@ -35,7 +37,7 @@
         </textarea>
          <!-- 发送按钮 -->
         <div class="flex justify-end">
-          <button class="flex items-center justify-center bg-[#4d6bfe] rounded-full w-8 h-8 border border-[#4d6bfe] hover:bg-[#3b5bef] transition-colors">
+          <button @click="sendMessage" class="flex items-center justify-center bg-[#4d6bfe] rounded-full w-8 h-8 border border-[#4d6bfe] hover:bg-[#3b5bef] transition-colors">
             <svg t="1749193234203" class="icon w-5 h-5" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1468" width="200" height="200"><path d="M554.666667 354.56V810.666667a42.666667 42.666667 0 0 1-85.333334 0V354.56a8.533333 8.533333 0 0 0-14.549333-5.973333l-184.149333 184.106666a42.666667 42.666667 0 0 1-60.330667-60.330666l241.365333-241.365334a85.333333 85.333333 0 0 1 120.661334 0l241.365333 241.365334a42.666667 42.666667 0 0 1-60.330667 60.330666l-184.149333-184.149333a8.533333 8.533333 0 0 0-14.549333 6.058667z" fill="#ffffff" p-id="1469"></path></svg>
           </button>
         </div>
@@ -62,11 +64,61 @@
 }
 </style>
 <script setup>
-import { ref } from 'vue';
-
+import { onBeforeUnmount, ref } from 'vue';
+const chatList = ref([
+  {role:'assistant',content:'我是DeepSeek Chat，由深度求索公司开发的智能AI助手！✨ 我可以帮你解答各种问题，无论是学习、工作，还是日常生活中的小困惑，都可以找我聊聊。有什么我可以帮你的吗？😊'},
+]);
 // textarea 引用
 const textareaRef = ref(null);
+const message = ref('');
+let eventSource = null;
 
+const sendMessage =async () => { 
+  if(!message.value.trim()) return;
+  const userMessage = message.value.trim();
+  chatList.value.push({role:'user',content:userMessage});
+  message.value = '';
+  if(textareaRef.value){
+    textareaRef.value.style.height='auto';
+  }
+  chatList.value.push({role:'assistant',content:''});
+  try {
+    eventSource = new EventSource(`http://localhost:8080/v6/ai/generateStream?message=${encodeURIComponent(userMessage)}`)
+    
+     let responseText = ''
+    eventSource.onmessage = (event) => {
+      console.log('接收到数据: ', event.data)
+      if(event.data){
+        responseText += event.data;
+        chatList.value[chatList.value.length - 1].content = responseText;
+      }
+    }
+
+    eventSource.onerror = (error) => {
+      if (error.eventPhase === EventSource.CLOSED) {
+        console.log('SSE正常关闭')
+      } else {
+        // 提示用户 “请求出错”
+        chatList.value[chatList.value.length - 1].content = '抱歉，请求出错了，请稍后重试。'
+      }
+      closeSSE();
+    }
+  } catch (error) {
+    console.error('发送消息错误: ', error)
+    // 提示用户 “请求出错”
+    chatList.value[chatList.value.length - 1].content = '抱歉，请求出错了，请稍后重试。';
+    closeSSE();
+  }
+}
+const closeSSE = () => {
+  if(eventSource){
+    eventSource.close();
+    eventSource = null;
+  }
+}
+onBeforeUnmount(() => {
+  closeSSE();
+})
 // 自动调整文本域高度
 const autoResize = () => {
   const textarea = textareaRef.value;
